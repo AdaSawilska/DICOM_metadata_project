@@ -526,15 +526,19 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Tworzenie zapytania SQL w celu pobrania szczegółowych informacji o danej serii na podstawie jej ID
     string query = "SELECT * FROM Series WHERE id = " + to_string(seriesID);
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -547,8 +551,11 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
     SQLCHAR modality[51];
     SQLCHAR bodypart[101];
     SQLCHAR seriesDescription[256];
+
+    // Pobranie wyników zapytania o szczegóły serii
     retcode = SQLFetch(hstmt);
     if (retcode == SQL_SUCCESS) {
+        // Pobranie danych o serii z wyniku zapytania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
         SQLGetData(hstmt, 3, SQL_C_CHAR, studyID, sizeof(studyID), NULL);
@@ -556,6 +563,7 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
         SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(bodypart), NULL);
         SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
 
+        // Wyświetlenie szczegółowych informacji o serii
         cout << "ID: " << id << endl;
         cout << "Series UID: " << seriesUID << endl;
         cout << "Study ID: " << studyID << endl;
@@ -563,36 +571,46 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
         cout << "Body Part: " << bodypart << endl;
         cout << "Series Description: " << seriesDescription << endl;
 
-        // Fetch and display associated series
+        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+
+        // Ponowna alokacja uchwytu dla nowego zapytania dotyczącego obrazów związanych z daną serią
         retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
         if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
             cout << "Error allocating statement handle" << endl;
             return;
         }
 
+        // Tworzenie zapytania SQL w celu pobrania obrazów związanych z daną serią
         query = "SELECT * FROM Image WHERE SeriesID = " + to_string(seriesID);
         retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
         if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
             cout << "Error executing query" << endl;
             SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
             return;
         }
 
+        // Wyświetlenie informacji o obrazach związanych z daną serią
         cout << "\nImages for Series ID " << seriesID << ":" << endl;
         SQLINTEGER imageid;
-        SQLCHAR ImagePath[256];
+        SQLCHAR imagePath[256];
         while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            // Pobranie danych o obrazie z wyniku zapytania
             SQLGetData(hstmt, 1, SQL_C_SLONG, &imageid, 0, NULL);
-            SQLGetData(hstmt, 2, SQL_C_CHAR, ImagePath, sizeof(ImagePath), NULL);
+            SQLGetData(hstmt, 2, SQL_C_CHAR, imagePath, sizeof(imagePath), NULL);
 
+            // Wyświetlenie informacji o obrazie
             cout << "Image ID: " << imageid << endl;
-            cout << "Image Path: " << ImagePath << endl;
+            cout << "Image Path: " << imagePath << endl;
             cout << "---------------------" << endl;
         }
 
+        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     } else {
+        // Komunikat informujący, że seria o podanym ID nie została znaleziona
         cout << "Series with ID " << seriesID << " not found." << endl;
     }
 }
@@ -600,15 +618,18 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
 void extract_error(SQLHANDLE handle, SQLSMALLINT type) {
     SQLINTEGER i = 0;
     SQLINTEGER native;
-    SQLCHAR state[SQL_SQLSTATE_SIZE + 1];
-    SQLCHAR text[SQL_MAX_MESSAGE_LENGTH];
+    SQLCHAR state[SQL_SQLSTATE_SIZE + 1]; // Bufor na kod stanu błędu SQL
+    SQLCHAR text[SQL_MAX_MESSAGE_LENGTH]; // Bufor na tekstowy opis błędu SQL
     SQLSMALLINT len;
     SQLRETURN ret;
 
     do {
+        // Pobranie kolejnego rekordu diagnostycznego dla danego uchwytu i typu błędu
         ret = SQLGetDiagRec(type, handle, ++i, state, &native, text, sizeof(text), &len);
         if (SQL_SUCCEEDED(ret)) {
-            std::cout << "SQL Error: " << state << " - " << text << std::endl;
+            // Wyświetlenie komunikatu o błędzie SQL
+            cout << "SQL Error: " << state << " - " << text << std::endl;
         }
-    } while (ret == SQL_SUCCESS);
+    } while (ret == SQL_SUCCESS); // Pętla wykonuje się dopóki udaje się pobierać rekordy diagnostyczne
+    // Pętla kończy się gdy ret != SQL_SUCCESS, co oznacza, że nie ma więcej rekordów diagnostycznych do pobrania
 }
