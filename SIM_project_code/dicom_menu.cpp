@@ -1,27 +1,68 @@
-#include <iostream>
-#include <fstream> 
-#include <tinyxml2.h>
-#include <sql.h>
-#include <sqlext.h> 
-#include <string.h>
-#include <dirent.h> 
-#include <filesystem>
-#include <cstdio>
+#include <iostream>           // Włącza standardową bibliotekę wejścia/wyjścia C++.
+#include <fstream>            // Włącza bibliotekę umożliwiającą operacje na plikach.
+#include <tinyxml2.h>         // Włącza bibliotekę TinyXML-2 do analizy i generowania dokumentów XML.
+#include <sql.h>              // Włącza nagłówki do obsługi funkcji związanych z SQL.
+#include <sqlext.h>           // Dodatkowe nagłówki dla obsługi SQL.
+#include <string.h>           // Włącza bibliotekę dla operacji na łańcuchach znaków.
+#include <dirent.h>           // Włącza nagłówek umożliwiający operacje na katalogach i plikach w systemie plików.
+#include <filesystem>         // Włącza bibliotekę C++17 do zarządzania systemem plików i operacji na plikach.
+#include <cstdio>             // Włącza standardową bibliotekę wejścia/wyjścia C.
 
-using namespace tinyxml2;
-using namespace std;
+using namespace tinyxml2;    // Używa przestrzeni nazw tinyxml2 (z biblioteki TinyXML-2).
+using namespace std;         // Używa przestrzeni nazw standardowej (std) dla ułatwienia dostępu do elementów tych bibliotek w kodzie.
 
+// Definicja makra CHECK_ERROR z czterema parametrami:
+// - code: Kod błędu do sprawdzenia.
+// - str: Opis błędu do wyświetlenia w przypadku niepowodzenia.
+// - h: Uchwyt do zasobu (np. hstmt - uchwyt do instrukcji SQL).
+// - env: Uchwyt do środowiska (np. henv - uchwyt do środowiska SQL).
+
+// Warunek if sprawdza, czy wartość code nie jest równa SQL_SUCCESS (co oznacza niepowodzenie operacji SQL).
+
+// W przypadku niepowodzenia (code != SQL_SUCCESS):
+// - Wywołuje funkcję extract_error(str, h, env), która zajmuje się pobraniem informacji o błędzie na podstawie podanego opisu str i uchwytów h i env.
+// - Wywołuje funkcję clearHandle(hstmt, hdbc, henv), która służy do zwolnienia zasobów reprezentowanych przez uchwyty hstmt, hdbc i henv.
+// - Natychmiast zwraca wartość 0, kończąc bieżącą funkcję i sygnalizując niepowodzenie lub wystąpienie błędu.
 #define CHECK_ERROR(code, str, h, env) if (code!=SQL_SUCCESS) {extract_error(str, h, env); clearHandle(hstmt, hdbc, henv); return 0;}
 
 void displayMenu();
+// Funkcja do wyświetlania menu głównego.
+
 void viewPatients(SQLHDBC hdbc);
+// Funkcja do wyświetlania listy pacjentów z bazy danych.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+
 void viewStudies(SQLHDBC hdbc);
+// Funkcja do wyświetlania listy badań pacjentów z bazy danych.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+
 void viewSeries(SQLHDBC hdbc);
+// Funkcja do wyświetlania listy serii obrazów z bazy danych.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+
 void viewImages(SQLHDBC hdbc);
+// Funkcja do wyświetlania listy obrazów z bazy danych.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+
 void viewPatientDetails(SQLHDBC hdbc, int patientID);
+// Funkcja do wyświetlania szczegółowych informacji o wybranym pacjencie.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+// Parametr `patientID` to identyfikator pacjenta.
+
 void viewStudyDetails(SQLHDBC hdbc, int studyID);
+// Funkcja do wyświetlania szczegółowych informacji o wybranym badaniu.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+// Parametr `studyID` to identyfikator badania.
+
 void viewSeriesDetails(SQLHDBC hdbc, int seriesID);
+// Funkcja do wyświetlania szczegółowych informacji o wybranej serii obrazów.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+// Parametr `seriesID` to identyfikator serii obrazów.
+
 void extract_error(SQLHANDLE handle, SQLSMALLINT type);
+// Funkcja do obsługi błędów związanych z bazą danych.
+// Parametr `handle` to uchwyt, którego błąd ma być wydobyty.
+// Parametr `type` to typ błędu, który ma zostać obsłużony.
 
 int main() {
     // Initialize ODBC environment and handles
