@@ -436,29 +436,36 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Tworzenie zapytania SQL w celu pobrania szczegółowych informacji o danym badaniu na podstawie jego ID
     string query = "SELECT * FROM Study WHERE id = " + to_string(studyID);
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
     }
 
-    cout << "\nStudy Details:" << endl;
+    cout << "\nStudy Details: " << endl;
     SQLINTEGER id;
     SQLCHAR studyUID[101];
     SQLCHAR patientID[101];
     SQLCHAR studyDate[11];
     SQLCHAR studyTime[9];
     SQLCHAR studyDescription[256];
+
+    // Pobranie wyników zapytania o szczegóły badania
     retcode = SQLFetch(hstmt);
     if (retcode == SQL_SUCCESS) {
+        // Pobranie danych o badaniu z wyniku zapytania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
         SQLGetData(hstmt, 3, SQL_C_CHAR, patientID, sizeof(patientID), NULL);
@@ -466,6 +473,7 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
         SQLGetData(hstmt, 5, SQL_C_CHAR, studyTime, sizeof(studyTime), NULL);
         SQLGetData(hstmt, 6, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
 
+        // Wyświetlenie szczegółowych informacji o badaniu
         cout << "ID: " << id << endl;
         cout << "Study UID: " << studyUID << endl;
         cout << "Patient ID: " << patientID << endl;
@@ -473,22 +481,28 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
         cout << "Study Time: " << studyTime << endl;
         cout << "Study Description: " << studyDescription << endl;
 
-        // Fetch and display associated series
+        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+
+        // Ponowna alokacja uchwytu dla nowego zapytania dotyczącego serii związanych z danym badaniem
         retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
         if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
             cout << "Error allocating statement handle" << endl;
             return;
         }
 
+        // Tworzenie zapytania SQL w celu pobrania serii związanych z danym badaniem
         query = "SELECT * FROM Series WHERE StudyID = " + to_string(studyID);
         retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
         if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
             cout << "Error executing query" << endl;
             SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
             return;
         }
 
+        // Wyświetlenie informacji o seriach związanych z danym badaniem
         cout << "\nSeries for Study ID " << studyID << ":" << endl;
         SQLINTEGER seriesID;
         SQLCHAR seriesUID[101];
@@ -496,12 +510,14 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
         SQLCHAR bodypart[101];
         SQLCHAR seriesDescription[256];
         while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            // Pobranie danych o serii z wyniku zapytania
             SQLGetData(hstmt, 1, SQL_C_SLONG, &seriesID, 0, NULL);
-            SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(studyUID), NULL);
-            SQLGetData(hstmt, 4, SQL_C_CHAR, modality, sizeof(studyDate), NULL);
-            SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(studyTime), NULL);
-            SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(studyDescription), NULL);
+            SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
+            SQLGetData(hstmt, 4, SQL_C_CHAR, modality, sizeof(modality), NULL);
+            SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(bodypart), NULL);
+            SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
 
+            // Wyświetlenie informacji o serii
             cout << "Series ID: " << seriesID << endl;
             cout << "Series UID: " << seriesUID << endl;
             cout << "Modality: " << modality << endl;
@@ -510,14 +526,16 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
             cout << "---------------------" << endl;
         }
 
-        // Prompt user to view details of a specific patient
+        // Prośba użytkownika o wyświetlenie szczegółów konkretnej serii
         int seriesIDtoview;
         cout << "\nEnter the Series ID you want to view details for: ";
         cin >> seriesIDtoview;
         viewSeriesDetails(hdbc, seriesIDtoview);
-        
+
+        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     } else {
+        // Komunikat informujący, że badanie o podanym ID nie zostało znalezione
         cout << "Study with ID " << studyID << " not found." << endl;
     }
 }
