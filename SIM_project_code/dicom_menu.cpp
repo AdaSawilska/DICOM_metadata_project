@@ -65,66 +65,82 @@ void extract_error(SQLHANDLE handle, SQLSMALLINT type);
 // Parametr `type` to typ błędu, który ma zostać obsłużony.
 
 int main() {
-    // Initialize ODBC environment and handles
-    SQLHENV henv = SQL_NULL_HENV;
-    SQLHDBC hdbc = SQL_NULL_HDBC;
-    SQLHSTMT hstmt = SQL_NULL_HSTMT;
-    SQLRETURN retcode;
+    // Inicjalizacja środowiska ODBC oraz uchwytów
+    SQLHENV henv = SQL_NULL_HENV;   // Uchwyt środowiska ODBC (puste początkowo)
+    SQLHDBC hdbc = SQL_NULL_HDBC;   // Uchwyt połączenia z bazą danych (puste początkowo)
+    SQLHSTMT hstmt = SQL_NULL_HSTMT; // Uchwyt instrukcji SQL (puste początkowo)
+    SQLRETURN retcode;               // Kod zwracany przez funkcje ODBC
 
-    // Allocate environment handle
+    // Alokacja uchwytu środowiska ODBC
     retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+    // Sprawdzenie wyniku alokacji uchwytu środowiska
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia alokacji, wyświetl komunikat o błędzie
         cout << "Error allocating environment handle" << endl;
+        // Zwróć wartość 1, co może oznaczać błąd wykonania programu
         return 1;
     }
 
-    // Set ODBC version
+    // Ustawienie wersji interfejsu ODBC
     retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, 0);
+    // Sprawdzenie wyniku ustawienia wersji interfejsu ODBC
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia ustawienia wersji, wyświetl komunikat o błędzie
         cout << "Error setting ODBC version" << endl;
+        // Zwolnienie uchwytu środowiska ODBC
         SQLFreeHandle(SQL_HANDLE_ENV, henv);
+        // Zwróć wartość 1, co może oznaczać błąd wykonania programu
         return 1;
     }
 
-    // Allocate connection handle
+    // Alokacja uchwytu połączenia
     retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+    // Sprawdzenie wyniku alokacji uchwytu połączenia
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia alokacji, wyświetl komunikat o błędzie
         cout << "Error allocating connection handle" << endl;
+        // Zwolnienie uchwytu środowiska ODBC
         SQLFreeHandle(SQL_HANDLE_ENV, henv);
+        // Zwróć wartość 1, co może oznaczać błąd wykonania programu
         return 1;
     }
 
-    // Connect to PostgreSQL database
+    // Połączenie z bazą danych PostgreSQL
     retcode = SQLConnect(hdbc, (SQLCHAR*)"testODBC", SQL_NTS, (SQLCHAR*)NULL, SQL_NTS, NULL, SQL_NTS);
+    // Sprawdzenie wyniku połączenia z bazą danych
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia połączenia, wyświetl komunikat o błędzie
         cout << "Error connecting to database" << endl;
+        // Zwolnienie uchwytu połączenia ODBC
         SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+        // Zwolnienie uchwytu środowiska ODBC
         SQLFreeHandle(SQL_HANDLE_ENV, henv);
+        // Zwróć wartość 1, co może oznaczać błąd wykonania programu
         return 1;
     }
 
     cout << "Connected to database!" << endl;
 
-    // Main loop for interactive menu
+    // Główna pętla obsługująca interaktywne menu
     while (true) {
-        displayMenu();
+        displayMenu(); // Wyświetlenie głównego menu interaktywnego
 
         int choice;
         cout << "Enter your choice: ";
-        cin >> choice;
+        cin >> choice; // Wczytanie wyboru użytkownika
 
         switch (choice) {
             case 1:
-                viewPatients(hdbc);
+                viewPatients(hdbc); // Wywołanie funkcji wyświetlającej listę pacjentów
                 break;
             case 2:
-                viewStudies(hdbc);
+                viewStudies(hdbc); // Wywołanie funkcji wyświetlającej listę badań
                 break;
             case 3:
-                viewSeries(hdbc);
+                viewSeries(hdbc); // Wywołanie funkcji wyświetlającej listę serii obrazów
                 break;
             case 4:
-                viewImages(hdbc);
+                viewImages(hdbc); // Wywołanie funkcji wyświetlającej listę obrazów
                 break;
             case 5:
                 cout << "Exiting..." << endl;
@@ -135,14 +151,14 @@ int main() {
         }
 
         if (choice == 5)
-            break;
+            break; // Przerwanie pętli głównej po wyborze opcji "5" (wyjście)
     }
 
-    // Disconnect and free resources
-    SQLDisconnect(hdbc);
-    SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
-    SQLFreeHandle(SQL_HANDLE_ENV, henv);
-
+    // Rozłączenie i zwolnienie zasobów
+    SQLDisconnect(hdbc); // Rozłączenie z bazą danych
+    SQLFreeHandle(SQL_HANDLE_DBC, hdbc); // Zwolnienie uchwytu połączenia ODBC
+    SQLFreeHandle(SQL_HANDLE_ENV, henv); // Zwolnienie uchwytu środowiska ODBC
+    
     return 0;
 }
 
