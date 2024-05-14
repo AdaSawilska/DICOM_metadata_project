@@ -163,6 +163,7 @@ int main() {
 }
 
 void displayMenu() {
+    // Wyświetlenie menu bazy danych DICOM
     cout << "\nDICOM Database Menu" << endl;
     cout << "1. View Patients" << endl;
     cout << "2. View Studies" << endl;
@@ -175,14 +176,18 @@ void viewPatients(SQLHDBC hdbc) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia alokacji, wyświetl błąd i zakończ funkcję
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Wykonanie zapytania SQL w celu pobrania wszystkich pacjentów
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)"SELECT * FROM Patient", SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // W przypadku niepowodzenia wykonania zapytania, wyświetl błąd i zwolnij uchwyt instrukcji
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -191,18 +196,24 @@ void viewPatients(SQLHDBC hdbc) {
     cout << "\nPatients:" << endl;
     SQLINTEGER id;
     SQLCHAR name[101];
+    // Pętla odczytująca dane o pacjentach z wyników zapytania
     while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        // Pobranie ID pacjenta
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        // Pobranie nazwy pacjenta
         SQLGetData(hstmt, 4, SQL_C_CHAR, name, sizeof(name), NULL);
+        // Wyświetlenie ID i nazwy pacjenta
         cout << "ID: " << id << ", Name: " << name << endl;
     }
 
+    // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 
-    // Prompt user to view details of a specific patient
+    // Prośba użytkownika o wyświetlenie szczegółowych informacji o wybranym pacjencie
     int patientID;
     cout << "Enter the ID of the patient you want to view details for: ";
     cin >> patientID;
+    // Wywołanie funkcji wyświetlającej szczegóły pacjenta
     viewPatientDetails(hdbc, patientID);
 }
 
@@ -210,14 +221,18 @@ void viewStudies(SQLHDBC hdbc) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Wykonanie zapytania SQL w celu pobrania wszystkich danych dotyczących badań
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)"SELECT * FROM Study", SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -226,18 +241,24 @@ void viewStudies(SQLHDBC hdbc) {
     cout << "\nStudies:" << endl;
     SQLINTEGER id;
     SQLCHAR studyUID[101];
+    // Pętla odczytująca dane o badaniach z wyników zapytania
     while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        // Pobranie ID badania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        // Pobranie StudyUID badania
         SQLGetData(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
+        // Wyświetlenie ID badania oraz jego StudyUID
         cout << "ID: " << id << ", StudyUID: " << studyUID << endl;
     }
 
+    // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 
-    // Prompt user to view details of a specific patient
+    // Prośba użytkownika o wyświetlenie szczegółów wybranego badania
     int studyID;
     cout << "Enter the Study ID you want to view details for: ";
     cin >> studyID;
+    // Wywołanie funkcji wyświetlającej szczegóły badania
     viewStudyDetails(hdbc, studyID);
 }
 
@@ -245,14 +266,18 @@ void viewSeries(SQLHDBC hdbc) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Wykonanie zapytania SQL w celu pobrania wszystkich danych dotyczących serii obrazów
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)"SELECT * FROM Series", SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -261,18 +286,24 @@ void viewSeries(SQLHDBC hdbc) {
     cout << "\nSeries:" << endl;
     SQLINTEGER id;
     SQLCHAR modality[51];
+    // Pętla odczytująca dane o seriach z wyników zapytania
     while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        // Pobranie ID serii
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        // Pobranie modalności serii
         SQLGetData(hstmt, 4, SQL_C_CHAR, modality, sizeof(modality), NULL);
+        // Wyświetlenie ID serii oraz modalności
         cout << "ID: " << id << ", Modality: " << modality << endl;
     }
 
+    // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 
-    // Prompt user to view details of a specific patient
+    // Prośba użytkownika o wyświetlenie szczegółów wybranej serii
     int seriesID;
     cout << "Enter the Series ID you want to view details for: ";
     cin >> seriesID;
+    // Wywołanie funkcji wyświetlającej szczegóły serii
     viewSeriesDetails(hdbc, seriesID);
 }
 
@@ -280,14 +311,18 @@ void viewImages(SQLHDBC hdbc) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
+    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
+    // Wykonanie zapytania SQL w celu pobrania wszystkich danych dotyczących obrazów
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)"SELECT * FROM Image", SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        // Wyświetlenie błędu w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -296,12 +331,17 @@ void viewImages(SQLHDBC hdbc) {
     cout << "\nImages:" << endl;
     SQLINTEGER id;
     SQLCHAR imagepath[256];
+    // Pętla odczytująca dane o obrazach z wyników zapytania
     while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        // Pobranie ID obrazu
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        // Pobranie ścieżki do obrazu
         SQLGetData(hstmt, 4, SQL_C_CHAR, imagepath, sizeof(imagepath), NULL);
+        // Wyświetlenie ID obrazu oraz ścieżki
         cout << "ID: " << id << ", Path: " << imagepath << endl;
     }
 
+    // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 }
 
