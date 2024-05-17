@@ -7,9 +7,11 @@
 #include <dirent.h>           // Włącza nagłówek umożliwiający operacje na katalogach i plikach w systemie plików.
 #include <filesystem>         // Włącza bibliotekę C++17 do zarządzania systemem plików i operacji na plikach.
 #include <cstdio>             // Włącza standardową bibliotekę wejścia/wyjścia C.
+#include <chrono>
+#include <iomanip>
 
-using namespace tinyxml2;    // Używa przestrzeni nazw tinyxml2 (z biblioteki TinyXML-2).
-using namespace std;         // Używa przestrzeni nazw standardowej (std) dla ułatwienia dostępu do elementów tych bibliotek w kodzie.
+using namespace tinyxml2;       // Używa przestrzeni nazw tinyxml2 (z biblioteki TinyXML-2).
+using namespace std;            // Używa przestrzeni nazw standardowej (std) dla ułatwienia dostępu do elementów tych bibliotek w kodzie.
 
 // Definicja makra CHECK_ERROR z czterema parametrami:
 // - code: Kod błędu do sprawdzenia.
@@ -25,44 +27,37 @@ using namespace std;         // Używa przestrzeni nazw standardowej (std) dla u
 // - Natychmiast zwraca wartość 0, kończąc bieżącą funkcję i sygnalizując niepowodzenie lub wystąpienie błędu.
 #define CHECK_ERROR(code, str, h, env) if (code!=SQL_SUCCESS) {extract_error(str, h, env); clearHandle(hstmt, hdbc, henv); return 0;}
 
-void displayMenu();
 // Funkcja do wyświetlania menu głównego.
+void displayMenu();
 
+// Funkcje do wyświetlania uproszczonych list pacjentów, badań, serii oraz obrazów z bazy danych.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
 void viewPatients(SQLHDBC hdbc);
-// Funkcja do wyświetlania listy pacjentów z bazy danych.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-
 void viewStudies(SQLHDBC hdbc);
-// Funkcja do wyświetlania listy badań pacjentów z bazy danych.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-
 void viewSeries(SQLHDBC hdbc);
-// Funkcja do wyświetlania listy serii obrazów z bazy danych.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-
 void viewImages(SQLHDBC hdbc);
-// Funkcja do wyświetlania listy obrazów z bazy danych.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
 
+// Funkcje do wyświetlania szczegółowych informacji o wybranych pacjentach, badaniach, seriach i obrazach.
+// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
+// Parametr `cośtamID` to identyfikator pacjenta, badania bądź serii.
 void viewPatientDetails(SQLHDBC hdbc, int patientID);
-// Funkcja do wyświetlania szczegółowych informacji o wybranym pacjencie.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-// Parametr `patientID` to identyfikator pacjenta.
-
 void viewStudyDetails(SQLHDBC hdbc, int studyID);
-// Funkcja do wyświetlania szczegółowych informacji o wybranym badaniu.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-// Parametr `studyID` to identyfikator badania.
-
 void viewSeriesDetails(SQLHDBC hdbc, int seriesID);
-// Funkcja do wyświetlania szczegółowych informacji o wybranej serii obrazów.
-// Parametr `hdbc` to uchwyt do połączenia z bazą danych.
-// Parametr `seriesID` to identyfikator serii obrazów.
 
-void extract_error(SQLHANDLE handle, SQLSMALLINT type);
+void viewStudiesForPatient(SQLHDBC hdbc, int patientID);
+void viewSeriesForStudy(SQLHDBC hdbc, int studyID);
+void viewImagesForSeries(SQLHDBC hdbc, int seriesID);
+
+void exportToXML(SQLHDBC hdbc);
+void exportPatientDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int patientID);
+void exportStudyDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int studyID);
+void exportSeriesDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int seriesID);
+void exportImageDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int imageID);
+
 // Funkcja do obsługi błędów związanych z bazą danych.
 // Parametr `handle` to uchwyt, którego błąd ma być wydobyty.
 // Parametr `type` to typ błędu, który ma zostać obsłużony.
+void extract_error(SQLHANDLE handle, SQLSMALLINT type);
 
 int main() {
     // Inicjalizacja środowiska ODBC oraz uchwytów
@@ -123,26 +118,29 @@ int main() {
 
     // Główna pętla obsługująca interaktywne menu
     while (true) {
-        displayMenu(); // Wyświetlenie głównego menu interaktywnego
+        displayMenu();
 
         int choice;
         cout << "Enter your choice: ";
-        cin >> choice; // Wczytanie wyboru użytkownika
+        cin >> choice;
 
         switch (choice) {
             case 1:
-                viewPatients(hdbc); // Wywołanie funkcji wyświetlającej listę pacjentów
+                viewPatients(hdbc);
                 break;
             case 2:
-                viewStudies(hdbc); // Wywołanie funkcji wyświetlającej listę badań
+                viewStudies(hdbc);
                 break;
             case 3:
-                viewSeries(hdbc); // Wywołanie funkcji wyświetlającej listę serii obrazów
+                viewSeries(hdbc);
                 break;
             case 4:
-                viewImages(hdbc); // Wywołanie funkcji wyświetlającej listę obrazów
+                viewImages(hdbc);
                 break;
             case 5:
+                exportToXML(hdbc);
+                break;
+            case 6:
                 cout << "Exiting..." << endl;
                 break;
             default:
@@ -150,26 +148,29 @@ int main() {
                 break;
         }
 
-        if (choice == 5)
-            break; // Przerwanie pętli głównej po wyborze opcji "5" (wyjście)
+        if (choice == 6)
+            break;
     }
 
     // Rozłączenie i zwolnienie zasobów
     SQLDisconnect(hdbc); // Rozłączenie z bazą danych
     SQLFreeHandle(SQL_HANDLE_DBC, hdbc); // Zwolnienie uchwytu połączenia ODBC
     SQLFreeHandle(SQL_HANDLE_ENV, henv); // Zwolnienie uchwytu środowiska ODBC
-    
+
     return 0;
 }
 
 void displayMenu() {
-    // Wyświetlenie menu bazy danych DICOM
+    // Wyświetlenie menu do obsługi bazy danych DICOM
     cout << "\nDICOM Database Menu" << endl;
+    cout << "\nData Browser: " << endl;
     cout << "1. View Patients" << endl;
     cout << "2. View Studies" << endl;
     cout << "3. View Series" << endl;
     cout << "4. View Images" << endl;
-    cout << "5. Exit" << endl;
+    cout << "\nData Export: " << endl;
+    cout << "5. Export to XML file" << endl;
+    cout << "\n6. Exit" << endl;
 }
 
 void viewPatients(SQLHDBC hdbc) {
@@ -329,16 +330,19 @@ void viewImages(SQLHDBC hdbc) {
     }
 
     cout << "\nImages:" << endl;
-    SQLINTEGER id;
-    SQLCHAR imagepath[256];
+    SQLINTEGER imageid;
+    SQLCHAR ImagePath[256];
     // Pętla odczytująca dane o obrazach z wyników zapytania
     while (SQLFetch(hstmt) == SQL_SUCCESS) {
         // Pobranie ID obrazu
-        SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
+        SQLGetData(hstmt, 1, SQL_C_SLONG, &imageid, 0, NULL);
         // Pobranie ścieżki do obrazu
-        SQLGetData(hstmt, 4, SQL_C_CHAR, imagepath, sizeof(imagepath), NULL);
+        SQLGetData(hstmt, 2, SQL_C_CHAR, ImagePath, sizeof(ImagePath), NULL);
+
         // Wyświetlenie ID obrazu oraz ścieżki
-        cout << "ID: " << id << ", Path: " << imagepath << endl;
+        cout << "Image ID: " << imageid << endl;
+        cout << "Image Path: " << ImagePath << endl;
+        cout << "---------------------" << endl;
     }
 
     // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
@@ -349,103 +353,85 @@ void viewPatientDetails(SQLHDBC hdbc, int patientID) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
-    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
-    // Tworzenie zapytania SQL w celu pobrania szczegółowych informacji o pacjencie na podstawie jego ID
     string query = "SELECT * FROM Patient WHERE id = " + to_string(patientID);
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
     }
 
-    cout << "\nPatient Details: " << endl;
+    cout << "\nPatient Details:" << endl;
     SQLINTEGER id;
     SQLCHAR birthdate[11];
     SQLCHAR sex[11];
     SQLCHAR name[101];
     SQLCHAR dicomID[101];
-
-    // Pobranie wyników zapytania o szczegóły pacjenta
     retcode = SQLFetch(hstmt);
     if (retcode == SQL_SUCCESS) {
-        // Pobranie danych o pacjencie z wyniku zapytania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(hstmt, 2, SQL_C_CHAR, birthdate, sizeof(birthdate), NULL);
         SQLGetData(hstmt, 3, SQL_C_CHAR, sex, sizeof(sex), NULL);
         SQLGetData(hstmt, 4, SQL_C_CHAR, name, sizeof(name), NULL);
         SQLGetData(hstmt, 5, SQL_C_CHAR, dicomID, sizeof(dicomID), NULL);
 
-        // Wyświetlenie szczegółowych informacji o pacjencie
         cout << "ID: " << id << endl;
         cout << "Birthdate: " << birthdate << endl;
         cout << "Sex: " << sex << endl;
         cout << "Name: " << name << endl;
         cout << "Dicom ID: " << dicomID << endl;
 
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
-        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // // Fetch and display associated studies
+        // SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error allocating statement handle" << endl;
+        //     return;
+        // }
 
-        // Ponowna alokacja uchwytu dla nowego zapytania dotyczącego badań związanych z danym pacjentem
-        retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
-            cout << "Error allocating statement handle" << endl;
-            return;
-        }
+        // query = "SELECT * FROM Study WHERE PatientID = " + to_string(patientID);
+        // retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error executing query" << endl;
+        //     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        //     return;
+        // }
 
-        // Tworzenie zapytania SQL w celu pobrania badań związanych z danym pacjentem
-        query = "SELECT * FROM Study WHERE PatientID = " + to_string(patientID);
-        retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
-            cout << "Error executing query" << endl;
-            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-            return;
-        }
+        // cout << "\nStudies for Patient ID " << patientID << ":" << endl;
+        // SQLINTEGER studyID;
+        // SQLCHAR studyUID[101];
+        // SQLCHAR studyDate[11];
+        // SQLCHAR studyTime[9];
+        // SQLCHAR studyDescription[256];
+        // while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        //     SQLGetData(hstmt, 1, SQL_C_SLONG, &studyID, 0, NULL);
+        //     SQLGetData(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
+        //     SQLGetData(hstmt, 4, SQL_C_CHAR, studyDate, sizeof(studyDate), NULL);
+        //     SQLGetData(hstmt, 5, SQL_C_CHAR, studyTime, sizeof(studyTime), NULL);
+        //     SQLGetData(hstmt, 6, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
 
-        // Wyświetlenie informacji o badaniach związanych z danym pacjentem
-        cout << "\nStudies for Patient ID " << patientID << ":" << endl;
-        SQLINTEGER studyID;
-        SQLCHAR studyUID[101];
-        SQLCHAR studyDate[11];
-        SQLCHAR studyTime[9];
-        SQLCHAR studyDescription[256];
-        while (SQLFetch(hstmt) == SQL_SUCCESS) {
-            // Pobranie danych o badaniach z wyniku zapytania
-            SQLGetData(hstmt, 1, SQL_C_SLONG, &studyID, 0, NULL);
-            SQLGetData(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
-            SQLGetData(hstmt, 4, SQL_C_CHAR, studyDate, sizeof(studyDate), NULL);
-            SQLGetData(hstmt, 5, SQL_C_CHAR, studyTime, sizeof(studyTime), NULL);
-            SQLGetData(hstmt, 6, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
+        //     cout << "Study ID: " << studyID << endl;
+        //     cout << "Study UID: " << studyUID << endl;
+        //     cout << "Study Date: " << studyDate << endl;
+        //     cout << "Study Time: " << studyTime << endl;
+        //     cout << "Study Description: " << studyDescription << endl;
+        //     cout << "---------------------" << endl;
+        // }
+        
+        // // Prompt user to view details of a specific patient
+        // int studyIDtoview;
+        // cout << "\nEnter the Study ID you want to view details for: ";
+        // cin >> studyIDtoview;
+        // viewStudyDetails(hdbc, studyIDtoview);
 
-            // Wyświetlenie informacji o badaniu
-            cout << "Study ID: " << studyID << endl;
-            cout << "Study UID: " << studyUID << endl;
-            cout << "Study Date: " << studyDate << endl;
-            cout << "Study Time: " << studyTime << endl;
-            cout << "Study Description: " << studyDescription << endl;
-            cout << "---------------------" << endl;
-        }
-
-        // Prośba użytkownika o wyświetlenie szczegółów konkretnej serii badania
-        int studyIDtoview;
-        cout << "\nEnter the Study ID you want to view details for: ";
-        cin >> studyIDtoview;
-        viewStudyDetails(hdbc, studyIDtoview);
-
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     } else {
-        // Komunikat informujący, że pacjent o danym ID nie został znaleziony
         cout << "Patient with ID " << patientID << " not found." << endl;
     }
 }
@@ -454,36 +440,29 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
-    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
-    // Tworzenie zapytania SQL w celu pobrania szczegółowych informacji o danym badaniu na podstawie jego ID
     string query = "SELECT * FROM Study WHERE id = " + to_string(studyID);
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
     }
 
-    cout << "\nStudy Details: " << endl;
+    cout << "\nStudy Details:" << endl;
     SQLINTEGER id;
     SQLCHAR studyUID[101];
     SQLCHAR patientID[101];
     SQLCHAR studyDate[11];
     SQLCHAR studyTime[9];
     SQLCHAR studyDescription[256];
-
-    // Pobranie wyników zapytania o szczegóły badania
     retcode = SQLFetch(hstmt);
     if (retcode == SQL_SUCCESS) {
-        // Pobranie danych o badaniu z wyniku zapytania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
         SQLGetData(hstmt, 3, SQL_C_CHAR, patientID, sizeof(patientID), NULL);
@@ -491,7 +470,6 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
         SQLGetData(hstmt, 5, SQL_C_CHAR, studyTime, sizeof(studyTime), NULL);
         SQLGetData(hstmt, 6, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
 
-        // Wyświetlenie szczegółowych informacji o badaniu
         cout << "ID: " << id << endl;
         cout << "Study UID: " << studyUID << endl;
         cout << "Patient ID: " << patientID << endl;
@@ -499,61 +477,51 @@ void viewStudyDetails(SQLHDBC hdbc, int studyID) {
         cout << "Study Time: " << studyTime << endl;
         cout << "Study Description: " << studyDescription << endl;
 
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
-        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // // Fetch and display associated series
+        // SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error allocating statement handle" << endl;
+        //     return;
+        // }
 
-        // Ponowna alokacja uchwytu dla nowego zapytania dotyczącego serii związanych z danym badaniem
-        retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
-            cout << "Error allocating statement handle" << endl;
-            return;
-        }
+        // query = "SELECT * FROM Series WHERE StudyID = " + to_string(studyID);
+        // retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error executing query" << endl;
+        //     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        //     return;
+        // }
 
-        // Tworzenie zapytania SQL w celu pobrania serii związanych z danym badaniem
-        query = "SELECT * FROM Series WHERE StudyID = " + to_string(studyID);
-        retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
-            cout << "Error executing query" << endl;
-            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-            return;
-        }
+        // cout << "\nSeries for Study ID " << studyID << ":" << endl;
+        // SQLINTEGER seriesID;
+        // SQLCHAR seriesUID[101];
+        // SQLCHAR modality[51];
+        // SQLCHAR bodypart[101];
+        // SQLCHAR seriesDescription[256];
+        // while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        //     SQLGetData(hstmt, 1, SQL_C_SLONG, &seriesID, 0, NULL);
+        //     SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(studyUID), NULL);
+        //     SQLGetData(hstmt, 4, SQL_C_CHAR, modality, sizeof(studyDate), NULL);
+        //     SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(studyTime), NULL);
+        //     SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(studyDescription), NULL);
 
-        // Wyświetlenie informacji o seriach związanych z danym badaniem
-        cout << "\nSeries for Study ID " << studyID << ":" << endl;
-        SQLINTEGER seriesID;
-        SQLCHAR seriesUID[101];
-        SQLCHAR modality[51];
-        SQLCHAR bodypart[101];
-        SQLCHAR seriesDescription[256];
-        while (SQLFetch(hstmt) == SQL_SUCCESS) {
-            // Pobranie danych o serii z wyniku zapytania
-            SQLGetData(hstmt, 1, SQL_C_SLONG, &seriesID, 0, NULL);
-            SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
-            SQLGetData(hstmt, 4, SQL_C_CHAR, modality, sizeof(modality), NULL);
-            SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(bodypart), NULL);
-            SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
+        //     cout << "Series ID: " << seriesID << endl;
+        //     cout << "Series UID: " << seriesUID << endl;
+        //     cout << "Modality: " << modality << endl;
+        //     cout << "Body Part: " << bodypart << endl;
+        //     cout << "Series Description: " << seriesDescription << endl;
+        //     cout << "---------------------" << endl;
+        // }
 
-            // Wyświetlenie informacji o serii
-            cout << "Series ID: " << seriesID << endl;
-            cout << "Series UID: " << seriesUID << endl;
-            cout << "Modality: " << modality << endl;
-            cout << "Body Part: " << bodypart << endl;
-            cout << "Series Description: " << seriesDescription << endl;
-            cout << "---------------------" << endl;
-        }
-
-        // Prośba użytkownika o wyświetlenie szczegółów konkretnej serii
-        int seriesIDtoview;
-        cout << "\nEnter the Series ID you want to view details for: ";
-        cin >> seriesIDtoview;
-        viewSeriesDetails(hdbc, seriesIDtoview);
-
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
+        // // Prompt user to view details of a specific patient
+        // int seriesIDtoview;
+        // cout << "\nEnter the Series ID you want to view details for: ";
+        // cin >> seriesIDtoview;
+        // viewSeriesDetails(hdbc, seriesIDtoview);
+        
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     } else {
-        // Komunikat informujący, że badanie o podanym ID nie zostało znalezione
         cout << "Study with ID " << studyID << " not found." << endl;
     }
 }
@@ -562,19 +530,15 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
     SQLHSTMT hstmt;
     SQLRETURN retcode;
 
-    // Alokacja nowego uchwytu dla instrukcji SQL
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
         cout << "Error allocating statement handle" << endl;
         return;
     }
 
-    // Tworzenie zapytania SQL w celu pobrania szczegółowych informacji o danej serii na podstawie jej ID
     string query = "SELECT * FROM Series WHERE id = " + to_string(seriesID);
     retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
     if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-        // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
         cout << "Error executing query" << endl;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return;
@@ -587,11 +551,8 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
     SQLCHAR modality[51];
     SQLCHAR bodypart[101];
     SQLCHAR seriesDescription[256];
-
-    // Pobranie wyników zapytania o szczegóły serii
     retcode = SQLFetch(hstmt);
     if (retcode == SQL_SUCCESS) {
-        // Pobranie danych o serii z wyniku zapytania
         SQLGetData(hstmt, 1, SQL_C_SLONG, &id, 0, NULL);
         SQLGetData(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
         SQLGetData(hstmt, 3, SQL_C_CHAR, studyID, sizeof(studyID), NULL);
@@ -599,7 +560,6 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
         SQLGetData(hstmt, 5, SQL_C_CHAR, bodypart, sizeof(bodypart), NULL);
         SQLGetData(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
 
-        // Wyświetlenie szczegółowych informacji o serii
         cout << "ID: " << id << endl;
         cout << "Series UID: " << seriesUID << endl;
         cout << "Study ID: " << studyID << endl;
@@ -607,48 +567,380 @@ void viewSeriesDetails(SQLHDBC hdbc, int seriesID) {
         cout << "Body Part: " << bodypart << endl;
         cout << "Series Description: " << seriesDescription << endl;
 
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
-        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // // Fetch and display associated series
+        // SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        // retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error allocating statement handle" << endl;
+        //     return;
+        // }
 
-        // Ponowna alokacja uchwytu dla nowego zapytania dotyczącego obrazów związanych z daną serią
-        retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia alokacji uchwytu
-            cout << "Error allocating statement handle" << endl;
-            return;
-        }
+        // query = "SELECT * FROM Image WHERE SeriesID = " + to_string(seriesID);
+        // retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+        // if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        //     cout << "Error executing query" << endl;
+        //     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        //     return;
+        // }
 
-        // Tworzenie zapytania SQL w celu pobrania obrazów związanych z daną serią
-        query = "SELECT * FROM Image WHERE SeriesID = " + to_string(seriesID);
-        retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
-        if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
-            // Wyświetlenie komunikatu o błędzie w przypadku niepowodzenia wykonania zapytania
-            cout << "Error executing query" << endl;
-            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-            return;
-        }
+        // cout << "\nImages for Series ID " << seriesID << ":" << endl;
+        // SQLINTEGER imageid;
+        // SQLCHAR ImagePath[256];
+        // while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        //     SQLGetData(hstmt, 1, SQL_C_SLONG, &imageid, 0, NULL);
+        //     SQLGetData(hstmt, 2, SQL_C_CHAR, ImagePath, sizeof(ImagePath), NULL);
 
-        // Wyświetlenie informacji o obrazach związanych z daną serią
-        cout << "\nImages for Series ID " << seriesID << ":" << endl;
-        SQLINTEGER imageid;
-        SQLCHAR imagePath[256];
-        while (SQLFetch(hstmt) == SQL_SUCCESS) {
-            // Pobranie danych o obrazie z wyniku zapytania
-            SQLGetData(hstmt, 1, SQL_C_SLONG, &imageid, 0, NULL);
-            SQLGetData(hstmt, 2, SQL_C_CHAR, imagePath, sizeof(imagePath), NULL);
+        //     cout << "Image ID: " << imageid << endl;
+        //     cout << "Image Path: " << ImagePath << endl;
+        //     cout << "---------------------" << endl;
+        // }
 
-            // Wyświetlenie informacji o obrazie
-            cout << "Image ID: " << imageid << endl;
-            cout << "Image Path: " << imagePath << endl;
-            cout << "---------------------" << endl;
-        }
-
-        // Zwolnienie uchwytu instrukcji po zakończeniu operacji na wynikach
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     } else {
-        // Komunikat informujący, że seria o podanym ID nie została znaleziona
         cout << "Series with ID " << seriesID << " not found." << endl;
     }
+}
+
+void viewStudiesForPatient(SQLHDBC hdbc, int patientID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+
+    // Allocate a statement handle
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle" << endl;
+        return;
+    }
+
+    // SQL query to get studies for the specific patient
+    string query = "SELECT ID, studyUID, studyDate, studyDescription FROM Study WHERE patientID = " + to_string(patientID);
+
+    // Execute the SQL query
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error executing SQL query for studies" << endl;
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        return;
+    }
+
+    // Bind columns
+    SQLINTEGER studyID;
+    SQLCHAR studyUID[101];
+    SQLCHAR studyDate[11];
+    SQLCHAR studyDescription[256];
+    SQLBindCol(hstmt, 1, SQL_C_SLONG, &studyID, 0, NULL);
+    SQLBindCol(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
+    SQLBindCol(hstmt, 3, SQL_C_CHAR, studyDate, sizeof(studyDate), NULL);
+    SQLBindCol(hstmt, 4, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
+
+    // Fetch and display the results
+    cout << "\nStudies for Patient ID " << patientID << ":\n";
+    cout << "---------------------------------------------\n";
+    cout << "ID\tStudy UID\t\tStudy Date\tStudy Description\n";
+    cout << "---------------------------------------------\n";
+
+    while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        cout << studyID << "\t" << studyUID << "\t" << studyDate << "\t" << studyDescription << endl;
+    }
+
+    cout << "---------------------------------------------\n";
+
+    // Free the statement handle
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void viewSeriesForStudy(SQLHDBC hdbc, int studyID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+
+    // Allocate a statement handle
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle" << endl;
+        return;
+    }
+
+    // SQL query to get series for the specific study
+    string query = "SELECT ID, seriesUID, modality, bodyPart, seriesDescription FROM Series WHERE studyID = " + to_string(studyID);
+
+    // Execute the SQL query
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error executing SQL query for series" << endl;
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        return;
+    }
+
+    // Bind columns
+    SQLINTEGER seriesID;
+    SQLCHAR seriesUID[101];
+    SQLCHAR modality[51];
+    SQLCHAR bodyPart[101];
+    SQLCHAR seriesDescription[256];
+    SQLBindCol(hstmt, 1, SQL_C_SLONG, &seriesID, 0, NULL);
+    SQLBindCol(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
+    SQLBindCol(hstmt, 3, SQL_C_CHAR, modality, sizeof(modality), NULL);
+    SQLBindCol(hstmt, 4, SQL_C_CHAR, bodyPart, sizeof(bodyPart), NULL);
+    SQLBindCol(hstmt, 5, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
+
+    // Fetch and display the results
+    cout << "\nSeries for Study ID " << studyID << ":\n";
+    cout << "-------------------------------------------------------------\n";
+    cout << "ID\tSeries UID\tModality\tBody Part\tSeries Description\n";
+    cout << "-------------------------------------------------------------\n";
+
+    while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        cout << seriesID << "\t" << seriesUID << "\t" << modality << "\t" << bodyPart << "\t" << seriesDescription << endl;
+    }
+
+    cout << "-------------------------------------------------------------\n";
+
+    // Free the statement handle
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void viewImagesForSeries(SQLHDBC hdbc, int seriesID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+
+    // Allocate a statement handle
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle" << endl;
+        return;
+    }
+
+    // SQL query to get images for the specific series
+    string query = "SELECT ID, imagePath FROM Image WHERE seriesID = " + to_string(seriesID);
+
+    // Execute the SQL query
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error executing SQL query for images" << endl;
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        return;
+    }
+
+    // Bind columns
+    SQLINTEGER imageID;
+    SQLCHAR imagePath[256];
+    SQLBindCol(hstmt, 1, SQL_C_SLONG, &imageID, 0, NULL);
+    SQLBindCol(hstmt, 2, SQL_C_CHAR, imagePath, sizeof(imagePath), NULL);
+
+    // Fetch and display the results
+    cout << "\nImages for Series ID " << seriesID << ":\n";
+    cout << "-------------------------------------\n";
+    cout << "ID\tImage Path\n";
+    cout << "-------------------------------------\n";
+
+    while (SQLFetch(hstmt) == SQL_SUCCESS) {
+        cout << imageID << "\t" << imagePath << endl;
+    }
+
+    cout << "-------------------------------------\n";
+
+    // Free the statement handle
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void exportToXML(SQLHDBC hdbc) {
+    int patientID, studyID, seriesID, imageID;
+
+    // Prompt user to select patient, study, series, and image IDs step by step
+    cout << "\nExport to XML - Select Patient, Study, Series, and Image:" << endl;
+
+    // Step 1: Select Patient
+    viewPatients(hdbc);
+    cout << "Enter the ID of the patient: ";
+    cin >> patientID;
+
+    // Step 2: Select Study for the Patient
+    viewStudiesForPatient(hdbc, patientID);
+    cout << "Enter the ID of the study: ";
+    cin >> studyID;
+
+    // Step 3: Select Series for the Study
+    viewSeriesForStudy(hdbc, studyID);
+    cout << "Enter the ID of the series: ";
+    cin >> seriesID;
+
+    // Step 4: Select Image for the Series
+    viewImagesForSeries(hdbc, seriesID);
+    cout << "Enter the ID of the image: ";
+    cin >> imageID;
+
+    // Prepare and execute SQL queries to fetch detailed information based on the selected IDs
+    // Generate XML content with the fetched data using TinyXML2
+    XMLDocument doc;
+    XMLNode* root = doc.NewElement("data");
+    doc.InsertFirstChild(root);
+
+    // Export full details for each selected entity to XML
+    exportPatientDetailsToXML(doc, hdbc, patientID);
+    exportStudyDetailsToXML(doc, hdbc, studyID);
+    exportSeriesDetailsToXML(doc, hdbc, seriesID);
+    exportImageDetailsToXML(doc, hdbc, imageID);
+
+    // // Save XML document to file
+    // string filename = "exported_data.xml";
+    // if (doc.SaveFile(filename.c_str()) == XML_SUCCESS) {
+    //     cout << "Data exported to XML file: " << filename << endl;
+    // } else {
+    //     cout << "Error: Unable to save XML file." << endl;
+    // }
+
+    // Generate unique filename with timestamp
+    auto now = chrono::system_clock::now();
+    auto now_c = chrono::system_clock::to_time_t(now);
+    stringstream ss;
+    ss << put_time(localtime(&now_c), "%Y%m%d%H%M%S");
+    string filename = "exported_data_" + ss.str() + ".xml";
+
+    // Save XML document to file
+    if (doc.SaveFile(filename.c_str()) == XML_SUCCESS) {
+        cout << "Data exported to XML file: " << filename << endl;
+    } else {
+        cout << "Error: Unable to save XML file." << endl;
+    }
+
+}
+
+void exportPatientDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int patientID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle for patient details" << endl;
+        return;
+    }
+
+    string query = "SELECT * FROM Patient WHERE ID = " + to_string(patientID);
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        SQLCHAR birthDate[11], sex[11], name[101], dicomID[256];
+        SQLBindCol(hstmt, 2, SQL_C_CHAR, birthDate, sizeof(birthDate), NULL);
+        SQLBindCol(hstmt, 3, SQL_C_CHAR, sex, sizeof(sex), NULL);
+        SQLBindCol(hstmt, 4, SQL_C_CHAR, name, sizeof(name), NULL);
+        SQLBindCol(hstmt, 5, SQL_C_CHAR, dicomID, sizeof(dicomID), NULL);
+
+        while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            XMLElement* patientElem = doc.NewElement("patient");
+            patientElem->SetAttribute("id", patientID);
+            patientElem->SetAttribute("birthDate", (const char*)birthDate);
+            patientElem->SetAttribute("sex", (const char*)sex);
+            patientElem->SetAttribute("name", (const char*)name);
+            patientElem->SetAttribute("dicomID", (const char*)dicomID);
+            doc.FirstChildElement("data")->InsertEndChild(patientElem);
+        }
+    } else {
+        cout << "Error fetching patient details" << endl;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void exportStudyDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int studyID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle for study details" << endl;
+        return;
+    }
+
+    string query = "SELECT * FROM Study WHERE ID = " + to_string(studyID);
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        SQLCHAR studyUID[101], studyDate[11], studyTime[9], studyDescription[256];
+        SQLBindCol(hstmt, 2, SQL_C_CHAR, studyUID, sizeof(studyUID), NULL);
+        SQLBindCol(hstmt, 4, SQL_C_CHAR, studyDate, sizeof(studyDate), NULL);
+        SQLBindCol(hstmt, 5, SQL_C_CHAR, studyTime, sizeof(studyTime), NULL);
+        SQLBindCol(hstmt, 6, SQL_C_CHAR, studyDescription, sizeof(studyDescription), NULL);
+
+        while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            XMLElement* studyElem = doc.NewElement("study");
+            studyElem->SetAttribute("id", studyID);
+            studyElem->SetAttribute("studyUID", (const char*)studyUID);
+            studyElem->SetAttribute("studyDate", (const char*)studyDate);
+            studyElem->SetAttribute("studyTime", (const char*)studyTime);
+            studyElem->SetAttribute("studyDescription", (const char*)studyDescription);
+            doc.FirstChildElement("data")->InsertEndChild(studyElem);
+        }
+    } else {
+        cout << "Error fetching study details" << endl;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void exportSeriesDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int seriesID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle for series details" << endl;
+        return;
+    }
+
+    string query = "SELECT * FROM Series WHERE ID = " + to_string(seriesID);
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        SQLCHAR seriesUID[101], modality[51], bodyPart[101], seriesDescription[256];
+        SQLBindCol(hstmt, 2, SQL_C_CHAR, seriesUID, sizeof(seriesUID), NULL);
+        SQLBindCol(hstmt, 4, SQL_C_CHAR, modality, sizeof(modality), NULL);
+        SQLBindCol(hstmt, 5, SQL_C_CHAR, bodyPart, sizeof(bodyPart), NULL);
+        SQLBindCol(hstmt, 6, SQL_C_CHAR, seriesDescription, sizeof(seriesDescription), NULL);
+
+        while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            XMLElement* seriesElem = doc.NewElement("series");
+            seriesElem->SetAttribute("id", seriesID);
+            seriesElem->SetAttribute("seriesUID", (const char*)seriesUID);
+            seriesElem->SetAttribute("modality", (const char*)modality);
+            seriesElem->SetAttribute("bodyPart", (const char*)bodyPart);
+            seriesElem->SetAttribute("seriesDescription", (const char*)seriesDescription);
+            doc.FirstChildElement("data")->InsertEndChild(seriesElem);
+        }
+    } else {
+        cout << "Error fetching series details" << endl;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
+void exportImageDetailsToXML(XMLDocument &doc, SQLHDBC hdbc, int imageID) {
+    SQLHSTMT hstmt = SQL_NULL_HSTMT;
+    SQLRETURN retcode;
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+    if (retcode != SQL_SUCCESS && retcode != SQL_SUCCESS_WITH_INFO) {
+        cout << "Error allocating statement handle for image details" << endl;
+        return;
+    }
+
+    string query = "SELECT * FROM Image WHERE ID = " + to_string(imageID);
+    retcode = SQLExecDirect(hstmt, (SQLCHAR*)query.c_str(), SQL_NTS);
+
+    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+        SQLCHAR imagePath[256];
+        SQLBindCol(hstmt, 2, SQL_C_CHAR, imagePath, sizeof(imagePath), NULL);
+
+        while (SQLFetch(hstmt) == SQL_SUCCESS) {
+            XMLElement* imageElem = doc.NewElement("image");
+            imageElem->SetAttribute("id", imageID);
+            imageElem->SetAttribute("imagePath", (const char*)imagePath);
+            doc.FirstChildElement("data")->InsertEndChild(imageElem);
+        }
+    } else {
+        cout << "Error fetching image details" << endl;
+    }
+
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 }
 
 void extract_error(SQLHANDLE handle, SQLSMALLINT type) {
