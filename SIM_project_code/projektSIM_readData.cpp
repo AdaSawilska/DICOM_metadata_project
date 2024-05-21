@@ -8,6 +8,9 @@
 #include <dicomhero6/dicomhero.h>   // Dołączenie biblioteki dicomhero do obsługi plików DICOM
 #include <filesystem>               // Dołączenie biblioteki systemu plików C++17
 #include <cstdio>                   // Dołączenie biblioteki standardowego wejścia-wyjścia C
+#include <vector>
+#include <algorithm>                // For std::max and std::min
+
 
 using namespace tinyxml2;           // Użycie przestrzeni nazw tinyxml2
 using namespace std;                // Użycie standardowej przestrzeni nazw
@@ -94,14 +97,14 @@ string get_value(string wanted_column, string table, string given_column, string
 // funkcja tworzaca sciezke do pliku .jpg na podstawie sciezki do .dcm
 string createJPG_directory(const string& path) {
     // Get the parent directory of the given path
-    path parentPath = path(path).parent_path();
+    fs::path parentPath = fs::path(path).parent_path();
     // Stworzenie sciezki folderu JPEG na pliki .jpg, zeby potem go stworzyc
-    path jpgfolderPath = path(parentPath) / "JPEG";
+    fs::path jpgfolderPath = fs::path(parentPath) / "JPEG";
 
     // Check if the parent directory exists
     if (!fs::exists(jpgfolderPath)) {
         // Create the parent directory if it doesn't exist
-        if (!create_directories(jpgfolderPath)) {
+        if (!fs::create_directories(jpgfolderPath)) {
             cerr << "Error: Failed to create directory: " << jpgfolderPath << endl;
             return "";
         }
@@ -114,6 +117,7 @@ string createJPG_directory(const string& path) {
 bool endsWith(const string& str, const string& suffix) {
     return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+
 
 // funkcja rekurencyjna przeszukujaca foldery w poszukiwaniu plikow .dcm
 void tree(string p, SQLHDBC hdbc) {
@@ -148,6 +152,7 @@ void tree(string p, SQLHDBC hdbc) {
                 jpgname = jpgdir+ "/" + jpgname + ".jpg";
                 // save .dcm as .jpeg
                 dicomhero::CodecFactory::save(loadedDataSet, jpgname, dicomhero::codecType_t::jpeg);
+                
                 // Patient ID
                 string patientID = loadedDataSet.getString(dicomhero::TagId(dicomhero::tagId_t::PatientID_0010_0020), 0);
                 cout << patientID << endl;
