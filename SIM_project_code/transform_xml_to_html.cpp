@@ -1,52 +1,55 @@
-#include <iostream>
-#include <filesystem>
-#include <vector>
-#include <string>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
-#include <libxslt/xslt.h>
-#include <libxslt/xsltInternals.h>
-#include <libxslt/transform.h>
-#include <libxslt/xsltutils.h>
-#include <cstdlib>
+#include <iostream>          // Zawiera standardowe strumienie wejścia i wyjścia
+#include <filesystem>        // Zawiera funkcje do pracy z systemem plików
+#include <vector>            // Zawiera kontener wektorowy
+#include <string>            // Zawiera funkcje i klasy do pracy z ciągami znaków
+#include <libxml/parser.h>   // Zawiera funkcje do parsowania plików XML
+#include <libxml/xpath.h>    // Zawiera funkcje do obsługi XPath w XML
+#include <libxslt/xslt.h>    // Zawiera funkcje do transformacji XSLT
+#include <libxslt/xsltInternals.h> // Zawiera wewnętrzne funkcje XSLT
+#include <libxslt/transform.h>     // Zawiera funkcje do transformacji dokumentów XML za pomocą XSLT
+#include <libxslt/xsltutils.h>     // Zawiera dodatkowe narzędzia XSLT
+#include <cstdlib>           // Zawiera funkcje standardowe, takie jak system()
 
-namespace fs = std::filesystem;
+namespace fs = std::filesystem; // Używamy krótszego aliasu dla std::filesystem
 
-// Function to list XML files in the current directory
+// Funkcja do listowania plików XML w bieżącym katalogu
 void listXMLFiles(std::vector<std::string> &files) {
+    // Iterujemy po wszystkich plikach w bieżącym katalogu
     for (const auto &entry : fs::directory_iterator(fs::current_path())) {
+        // Sprawdzamy, czy plik ma rozszerzenie .xml i zawiera w nazwie "exported_data"
         if (entry.path().extension() == ".xml" && entry.path().stem().string().find("exported_data") != std::string::npos) {
+            // Dodajemy ścieżkę pliku do wektora files
             files.push_back(entry.path().string());
         }
     }
 }
 
-// Function to transform XML to HTML using XSLT
+// Funkcja do transformacji pliku XML na HTML za pomocą XSLT
 void transformXMLtoHTML(const std::string &xmlFile, const std::string &xsltFile, const std::string &htmlFile) {
-    // Initialize XML parser and XSLT engine
+    // Inicjalizujemy parser XML i silnik XSLT
     xmlSubstituteEntitiesDefault(1);
     xmlLoadExtDtdDefaultValue = 1;
     
-    // Load XSLT stylesheet
+    // Ładujemy arkusz stylów XSLT
     const char *params[] = { NULL };
     xsltStylesheetPtr stylesheet = xsltParseStylesheetFile((const xmlChar *)xsltFile.c_str());
 
-    // Parse XML document
+    // Parsujemy dokument XML
     xmlDocPtr document = xmlParseFile(xmlFile.c_str());
 
-    // Check if XML parsing was successful
+    // Sprawdzamy, czy parsowanie XML zakończyło się sukcesem
     if (document == NULL) {
         std::cerr << "Error parsing XML document: " << xmlFile << std::endl;
         return;
     }
 
-    // Apply XSLT transformation to XML document
+    // Stosujemy transformację XSLT na dokumencie XML
     xmlDocPtr result = xsltApplyStylesheet(stylesheet, document, params);
 
-    // Save transformed result to HTML file
+    // Zapisujemy wynik transformacji do pliku HTML
     xsltSaveResultToFilename(htmlFile.c_str(), result, stylesheet, 0);
 
-    // Free resources
+    // Zwalniamy zasoby
     xsltFreeStylesheet(stylesheet);
     xmlFreeDoc(document);
     xmlFreeDoc(result);
@@ -54,52 +57,50 @@ void transformXMLtoHTML(const std::string &xmlFile, const std::string &xsltFile,
     xmlCleanupParser();
 }
 
-// Function to open HTML file in default browser
+// Funkcja do otwierania pliku HTML w domyślnej przeglądarce
 void openHTMLFile(const std::string &htmlFile) {
+    // Tworzymy polecenie do otwarcia pliku HTML
     std::string command = "xdg-open " + htmlFile;
     system(command.c_str());
 }
 
 int main() {
-    // List XML files in the current directory
+    // Listujemy pliki XML w bieżącym katalogu
     std::vector<std::string> xmlFiles;
     listXMLFiles(xmlFiles);
 
-    // Check if XML files are found
+    // Sprawdzamy, czy znaleziono pliki XML
     if (xmlFiles.empty()) {
         std::cout << "No XML files found." << std::endl;
         return 1;
     }
 
-    // Display list of XML files for selection
+    // Wyświetlamy listę znalezionych plików XML do wyboru
     std::cout << "Select an XML file to transform:" << std::endl;
     for (size_t i = 0; i < xmlFiles.size(); ++i) {
         std::cout << i + 1 << ": " << xmlFiles[i] << std::endl;
     }
 
-    // Prompt user to choose an XML file
+    // Pobieramy wybór użytkownika
     int choice;
     std::cout << "Enter your choice (number): ";
     std::cin >> choice;
 
-    // Validate user choice
+    // Walidujemy wybór użytkownika
     if (choice < 1 || choice > xmlFiles.size()) {
         std::cerr << "Invalid choice." << std::endl;
         return 1;
     }
 
-    // Transform selected XML file to HTML
+    // Transformujemy wybrany plik XML na HTML
     std::string selectedXML = xmlFiles[choice - 1];
-    std::string xsltFile = "transform.xsl"; // Ensure this file is in the same directory or provide the correct path
+    std::string xsltFile = "transform.xsl"; // Upewnij się, że ten plik znajduje się w tym samym katalogu lub podaj poprawną ścieżkę
     std::string htmlFile = "output.html";
     transformXMLtoHTML(selectedXML, xsltFile, htmlFile);
     std::cout << "HTML file generated: " << htmlFile << std::endl;
 
-    // Open HTML file in default browser
+    // Otwieramy plik HTML w domyślnej przeglądarce
     openHTMLFile(htmlFile);
 
     return 0;
 }
-
-
-
