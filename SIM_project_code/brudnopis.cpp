@@ -2,7 +2,7 @@
 #include <cstring>  // For string manipulation
 #include <iostream> // For standard I/O operations
 #include <string>   // For using std::string
-#include "dicomhero/dicomhero.hpp" // Assuming this is the DICOM library you are using
+#include "dicomhero/dicomhero.hpp" // Assuming this is the library you are using
 
 using namespace std;
 
@@ -12,7 +12,8 @@ bool isDICOMFile(const string &filePath) {
         // Attempt to load the file as a DICOM file with a buffer size of 2048 bytes
         dicomhero::DataSet loadedDataSet(dicomhero::CodecFactory::load(filePath, 2048));
         return true; // If loading is successful, return true
-    } catch (...) {
+    } catch (const std::exception &e) {
+        cerr << "Error loading file as DICOM: " << filePath << " - " << e.what() << endl;
         return false; // If any exception is caught, return false
     }
 }
@@ -51,15 +52,25 @@ void tree(string p, SQLHDBC hdbc) {
                     continue; // Skip the current file and proceed to the next one if allocation fails
                 }
 
-                // Load and process the DICOM file
-                dicomhero::DataSet loadedDataSet(dicomhero::CodecFactory::load(pp, 2048)); // Load DICOM file
-                dicomhero::Image image(loadedDataSet.getImageApplyModalityTransform(0)); // Get the image from the dataset
-                string jpgdir = createJPG_directory(p); // Create directory for saving JPEG files
-                string jpgname = dp->d_name; // Use the original file name
-                jpgname = jpgdir + "/" + jpgname + ".jpg"; // Construct full path for the JPEG file
+                try {
+                    // Load and process the DICOM file
+                    dicomhero::DataSet loadedDataSet(dicomhero::CodecFactory::load(pp, 2048)); // Load DICOM file
+                    dicomhero::Image image(loadedDataSet.getImageApplyModalityTransform(0)); // Get the image from the dataset
+                    string jpgdir = createJPG_directory(p); // Create directory for saving JPEG files
+                    string jpgname = dp->d_name; // Use the original file name
 
-                // Save the image as a JPEG file
-                dicomhero::CodecFactory::save(loadedDataSet, jpgname, dicomhero::codecType_t::jpeg);
+                    // Ensure the file name is valid for further processing
+                    if (!jpgname.empty()) {
+                        jpgname = jpgdir + "/" + jpgname + ".jpg"; // Construct full path for the JPEG file
+
+                        // Save the image as a JPEG file
+                        dicomhero::CodecFactory::save(loadedDataSet, jpgname, dicomhero::codecType_t::jpeg);
+                    } else {
+                        cerr << "Warning: Empty file name encountered for file: " << pp << endl;
+                    }
+                } catch (const std::exception &e) {
+                    cerr << "Error processing DICOM file: " << pp << " - " << e.what() << endl;
+                }
 
                 // Free the allocated statement handle
                 SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
