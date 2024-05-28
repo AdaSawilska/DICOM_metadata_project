@@ -2,6 +2,36 @@
 #include <stdexcept>
 #include <string>
 
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
+// Assuming dicomhero namespace and relevant classes are already defined elsewhere
+// #include "dicomhero.h"
+
+int main() {
+    try {
+        // Patient Name
+        dicomhero::UnicodePatientName patientName;
+        wstring patientNameCharacter;
+        string patientNameCharacter_S;
+        
+        try {
+            patientName = loadedDataSet.getUnicodePatientName(dicomhero::TagId(dicomhero::tagId_t::PatientName_0010_0010), 0);
+            patientNameCharacter = patientName.getAlphabeticRepresentation();
+            patientNameCharacter_S = string(patientNameCharacter.begin(), patientNameCharacter.end());
+        } catch (const std::exception &e) {
+            patientNameCharacter_S = "";
+        }
+        
+        // cout << "Patient Name: " << patientNameCharacter_S << endl;
+    } catch (const std::exception &e) {
+        std::cerr << "An unexpected error occurred: " << e.what() << std::endl;
+    }
+    return 0;
+}
+
+
 int main() {
     try {
         // Study ID
