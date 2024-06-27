@@ -1,3 +1,4 @@
 # SIM project 2024 - DICOM database in postgresql
 
-Kod zapewnia połączenie z wcześniej utworzoną bazą danych ODBC w postgresie. Następnie przechodzi po wskazanym folderze z umieszczoną bazą DICOM. Meta dane z plików .dcm umieszcza w bazie danych ODBC oraz tworzy nowy folder JPEG, w którym umieszczone są przekonwertowane pliki .dcm na .jpg. Ścieżka do pliku .jpg jest umieszczona w bazie ODBC.
+The project is created in C++ and its main function is to establish a connection to an ODBC database in PostgreSQL. There are several scripts that together form the DICOM file handling software.
+
